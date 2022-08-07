@@ -2,91 +2,96 @@
 
 Server::Server(int nPort, QWidget *parent)
     : QWidget(parent),
-      m_nNextBlockSize(0),
+//      m_nNextBlockSize(0),
+      txt(new QTextEdit),
       serverStatusLabel(new QLabel)
 {
     initServer(nPort);
 
-    m_ptxt = new QTextEdit;
-    m_ptxt->setReadOnly(true);
+    txt->setReadOnly(true);
 
-    QVBoxLayout* pvbxLayout = new QVBoxLayout;
-    pvbxLayout->addWidget(new QLabel(tr("<H1>Сервер</H1>")));
-    pvbxLayout->addWidget(serverStatusLabel);
-    pvbxLayout->addWidget(m_ptxt);
 
-    setLayout(pvbxLayout);
+    QVBoxLayout* vBoxLayout = new QVBoxLayout;
+    vBoxLayout->addWidget(new QLabel(tr("<H1>Сервер</H1>")));
+    vBoxLayout->addWidget(serverStatusLabel);
+    vBoxLayout->addWidget(txt);
+
+    setLayout(vBoxLayout);
 }
 
 void Server::initServer(int nPort)
 {
-    m_ptcpServer = new QTcpServer(this);
-    if (!m_ptcpServer->listen(QHostAddress::Any, nPort)) {
+    tcpServer = new QTcpServer(this);
+    if (!tcpServer->listen(QHostAddress::Any, nPort)) {
         QMessageBox::critical(this, tr("Сервер"),
                               tr("Ошибка при запуске сервера: %1.")
-                              .arg(m_ptcpServer->errorString()));
+                              .arg(tcpServer->errorString()));
         return;
     }
 
     serverStatusLabel->setText(tr("Сервер прослушивает соединения по порту %1").arg(nPort));
 
-    connect(m_ptcpServer, SIGNAL(newConnection()),
-            this, SLOT(slotNewConnection()));
+    connect(tcpServer, &QTcpServer::newConnection,
+            this, &Server::slotNewConnection);
 }
 
 //void Server::closeServer()
 //{
-//    m_ptcpServer->close();
+//    tcpServer->close();
 //    closeServerButton->setEnabled(false);
 //    serverStatusLabel->setText(tr("Сервер отключен"));
 //}
 
 void Server::slotNewConnection()
 {
-    QTcpSocket* pClientSocket = m_ptcpServer->nextPendingConnection();
+    QTcpSocket* clientSocket = tcpServer->nextPendingConnection();
 
-    in.setDevice(pClientSocket);
+    in.setDevice(clientSocket);
     in.setVersion(QDataStream::Qt_5_10);
 
-    connect(pClientSocket, &QTcpSocket::disconnected,
-            pClientSocket, &QTcpSocket::deleteLater);
-    connect(pClientSocket, &QTcpSocket::readyRead,
+    connect(clientSocket, &QTcpSocket::disconnected,
+            clientSocket, &QTcpSocket::deleteLater);
+    connect(clientSocket, &QTcpSocket::readyRead,
             this, &Server::slotReadClient);
 
-    sendToClient(pClientSocket, tr("Сервер: Соединение установлено"));
+    sendToClient(clientSocket, tr("Сервер: Соединение установлено"));
 }
 
 void Server::slotReadClient()
 {
-    QTcpSocket* pClientSocket = (QTcpSocket*)sender();
-    QDataStream in(pClientSocket);
+    QTcpSocket* clientSocket = (QTcpSocket*)sender();
+//    QDataStream in(clientSocket);
+    in.setDevice(clientSocket);
     in.setVersion(QDataStream::Qt_5_10);
 
     in.startTransaction();
 
     QTime time;
     QString msg;
+
     in >> time >> msg;
 
     if (!in.commitTransaction())
+    {
         return;
+    }
 
-    QString strMessage = time.toString() + msg;
+    QString str = time.toString() + " " + msg;
 
-    m_ptxt->append(strMessage);
-    sendToClient(pClientSocket, tr("Server Response: Received \"") + msg + tr("\""));
+    txt->append(str);
+    sendToClient(clientSocket, tr("Сервер: Получено \"") + msg + tr("\""));
 
 //    for (;;)
 //    {
 //        if ( !m_nNextBlockSize)
 //        {
-//            if (pClientSocket->bytesAvailable() < sizeof (quint16))
+//            if (clientSocket->bytesAvailable() < sizeof (quint16))
 //            {
 //                break;
 //            }
 //            in >> m_nNextBlockSize;
 //        }
-//        if (pClientSocket->bytesAvailable() < m_nNextBlockSize)
+//        if (clientSocket->bytesAvailable() < m_nNextBlockSize)
 //        {
 //            break;
 //        }
@@ -96,25 +101,25 @@ void Server::slotReadClient()
 
 //        in >> time >> str;
 
-//        QString strMessage = time.toString() + " " + "Client has sent - " + str;
-//        m_ptxt->append(strMessage);
+//        QString str = time.toString() + " " + "Client has sent - " + str;
+//        txt->append(str);
 
 //        m_nNextBlockSize = 0;
-//        sendToClient(pClientSocket, tr("Server Response: Received \"") + str + tr("\""));
+//        sendToClient(clientSocket, tr("Server Response: Received \"") + str + tr("\""));
 //    }
 }
 
-void Server::sendToClient(QTcpSocket* pSocket, const QString& str)
+void Server::sendToClient(QTcpSocket* socket, const QString& str)
 {
     QByteArray arrBlock;
     QDataStream out(&arrBlock, QIODevice::WriteOnly);
     out.setVersion(QDataStream::Qt_5_10);
-    out << quint16(0) << QTime::currentTime() << str;
+    out << /*quint16(0) <<*/ QTime::currentTime() << str;
 
-    out.device()->seek(0);
-    out << quint16(arrBlock.size() - sizeof(quint16));
+//    out.device()->seek(0);
+//    out << quint16(arrBlock.size() - sizeof(quint16));
 
-    pSocket->write(arrBlock);
+    socket->write(arrBlock);
 }
 
 Server::~Server()

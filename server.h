@@ -25,10 +25,11 @@ private:
     void initServer(int nPort);
     void sendToClient(QTcpSocket* pSocket, const QString& str);
 
-    QTcpServer* m_ptcpServer = nullptr;
-    QTextEdit* m_ptxt;
-    quint16 m_nNextBlockSize;
+    QTcpServer* tcpServer = nullptr;
+    QTextEdit* txt;
+//    quint16 m_nNextBlockSize;
     QLabel* serverStatusLabel = nullptr;
+    QVBoxLayout* vBoxLayout;
     QDataStream in;
 };
 #endif // SERVER_H
