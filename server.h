@@ -6,8 +6,15 @@
 #include <QList>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QtWidgets>
 #include <QtNetwork>
+
+#define TABLE_WORD          "word"
+#define TABLE_DEFINITION    "definition"
+#define TABLE_EXAMPLE       "example"
+#define TABLE               "dictionary"
 
 class Server : public QWidget
 {
@@ -24,8 +31,10 @@ public slots:
 private:
     void initServer(int nPort);
     void sendToClient(QTcpSocket* pSocket, const QString& str);
+    void createTable();
 
     QTcpServer* tcpServer = nullptr;
+    QSqlDatabase db;
     QTextEdit* txt;
 //    quint16 m_nNextBlockSize;
     QLabel* serverStatusLabel = nullptr;

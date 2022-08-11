@@ -29,6 +29,24 @@ void Server::initServer(int nPort)
         return;
     }
 
+    db = QSqlDatabase::addDatabase("QPSQL");
+    db.setDatabaseName("qt_projects");
+    db.setUserName("postgres");
+    db.setPassword("root");
+
+    if(!db.open())
+    {
+        QMessageBox::critical(this, tr("Сервер"),
+                              tr("Ошибка при запуске сервера: %1.")
+                              .arg(tcpServer->errorString()));
+        return;
+    }
+
+    if (!db.tables().contains( QLatin1String("messages")))
+    {
+        createTable();
+    }
+
     serverStatusLabel->setText(tr("Сервер прослушивает соединения по порту %1").arg(nPort));
 
     connect(tcpServer, &QTcpServer::newConnection,
@@ -68,6 +86,7 @@ void Server::slotReadClient()
 
     QTime time;
     QString msg;
+    QString user;
 
     in >> time >> msg;
 
@@ -75,6 +94,21 @@ void Server::slotReadClient()
     {
         return;
     }
+
+    QSqlQuery query;
+    query.prepare("INSERT INTO messages ( time, "
+                                         " message   , "
+                                         " user      ) "
+                  "VALUES (:word, :definition, :example);");
+    query.bindValue(":time",    time.toString());
+    query.bindValue(":message", msg);
+    query.bindValue(":user",    user);                                  //Добавить пользователя
+
+
+//    if(!query.exec()){
+//        qDebug() << "Ошибка при добавлении записи в таблицу" << query.lastError().text() << "\n";
+//        return false;
+//    }
 
     QString str = time.toString() + " " + msg;
 
@@ -120,6 +154,28 @@ void Server::sendToClient(QTcpSocket* socket, const QString& str)
 //    out << quint16(arrBlock.size() - sizeof(quint16));
 
     socket->write(arrBlock);
+}
+
+void Server::createTable()
+{
+    QSqlQuery query;
+
+    query.prepare("CREATE TABLE messages ("
+                        "id BIGSERIAL NOT NULL PRIMARY KEY, "
+                        "time       VARCHAR(255)    NOT NULL, "
+                        "message    VARCHAR(255)    NOT NULL, "
+                        "user       VARCHAR(255)    NOT NULL  "
+                    " )"
+                  );
+
+
+    if(!query.exec())
+    {
+        qDebug() << "Ошибка при создании таблицы\n";
+        return;
+    }
+
+    qDebug() << "Таблица успешно создана\n";
 }
 
 Server::~Server()
