@@ -2,6 +2,9 @@
 #define SERVER_H
 
 #include <QDialog>
+#include <QObject>
+#include <QSql>
+#include <QSqlError>
 #include <QString>
 #include <QList>
 #include <QTcpServer>
@@ -22,7 +25,6 @@ class Server : public QWidget
 
 public:
     explicit Server(int nPort, QWidget *parent = nullptr);
-    ~Server();
 
 public slots:
     virtual void slotNewConnection();

@@ -2,7 +2,6 @@
 
 Server::Server(int nPort, QWidget *parent)
     : QWidget(parent),
-//      m_nNextBlockSize(0),
       txt(new QTextEdit),
       serverStatusLabel(new QLabel)
 {
@@ -47,18 +46,11 @@ void Server::initServer(int nPort)
         createTable();
     }
 
-    serverStatusLabel->setText(tr("Сервер прослушивает соединения по порту %1").arg(nPort));
+    serverStatusLabel->setText(tr("Сервер принимает соединения по порту %1").arg(nPort));
 
     connect(tcpServer, &QTcpServer::newConnection,
             this, &Server::slotNewConnection);
 }
-
-//void Server::closeServer()
-//{
-//    tcpServer->close();
-//    closeServerButton->setEnabled(false);
-//    serverStatusLabel->setText(tr("Сервер отключен"));
-//}
 
 void Server::slotNewConnection()
 {
@@ -78,7 +70,7 @@ void Server::slotNewConnection()
 void Server::slotReadClient()
 {
     QTcpSocket* clientSocket = (QTcpSocket*)sender();
-//    QDataStream in(clientSocket);
+
     in.setDevice(clientSocket);
     in.setVersion(QDataStream::Qt_5_10);
 
@@ -89,6 +81,7 @@ void Server::slotReadClient()
     QString user;
 
     in >> time >> msg;
+    user = QString::number(clientSocket->socketDescriptor());
 
     if (!in.commitTransaction())
     {
@@ -96,51 +89,27 @@ void Server::slotReadClient()
     }
 
     QSqlQuery query;
+
     query.prepare("INSERT INTO messages ( time, "
                                          " message   , "
-                                         " user      ) "
-                  "VALUES (:word, :definition, :example);");
+                                         " userr      ) "
+                  "VALUES (:time, :message, :userr);");
     query.bindValue(":time",    time.toString());
     query.bindValue(":message", msg);
-    query.bindValue(":user",    user);                                  //Добавить пользователя
+    query.bindValue(":userr",    user);
 
 
-//    if(!query.exec()){
-//        qDebug() << "Ошибка при добавлении записи в таблицу" << query.lastError().text() << "\n";
-//        return false;
-//    }
+    if(!query.exec())
+    {
+        QMessageBox::critical(this, tr("Сервер"),
+                         tr("Ошибка при добавлении записи в таблицу: %1.")
+                         .arg(query.lastError().text()));
+    }
 
     QString str = time.toString() + " " + msg;
 
     txt->append(str);
     sendToClient(clientSocket, tr("Сервер: Получено \"") + msg + tr("\""));
-
-//    for (;;)
-//    {
-//        if ( !m_nNextBlockSize)
-//        {
-//            if (clientSocket->bytesAvailable() < sizeof (quint16))
-//            {
-//                break;
-//            }
-//            in >> m_nNextBlockSize;
-//        }
-//        if (clientSocket->bytesAvailable() < m_nNextBlockSize)
-//        {
-//            break;
-//        }
-
-//        QTime time;
-//        QString str;
-
-//        in >> time >> str;
-
-//        QString str = time.toString() + " " + "Client has sent - " + str;
-//        txt->append(str);
-
-//        m_nNextBlockSize = 0;
-//        sendToClient(clientSocket, tr("Server Response: Received \"") + str + tr("\""));
-//    }
 }
 
 void Server::sendToClient(QTcpSocket* socket, const QString& str)
@@ -148,10 +117,7 @@ void Server::sendToClient(QTcpSocket* socket, const QString& str)
     QByteArray arrBlock;
     QDataStream out(&arrBlock, QIODevice::WriteOnly);
     out.setVersion(QDataStream::Qt_5_10);
-    out << /*quint16(0) <<*/ QTime::currentTime() << str;
-
-//    out.device()->seek(0);
-//    out << quint16(arrBlock.size() - sizeof(quint16));
+    out << QTime::currentTime() << str;
 
     socket->write(arrBlock);
 }
@@ -160,26 +126,17 @@ void Server::createTable()
 {
     QSqlQuery query;
 
-    query.prepare("CREATE TABLE messages ("
-                        "id BIGSERIAL NOT NULL PRIMARY KEY, "
-                        "time       VARCHAR(255)    NOT NULL, "
-                        "message    VARCHAR(255)    NOT NULL, "
-                        "user       VARCHAR(255)    NOT NULL  "
-                    " )"
-                  );
-
-
-    if(!query.exec())
+    if(!(query.exec("CREATE TABLE messages("
+                   "id BIGSERIAL NOT NULL PRIMARY KEY, "
+                   "time VARCHAR(8) NOT NULL, "
+                   "message VARCHAR(255) NOT NULL, "
+                   "userr VARCHAR(40) NOT NULL"
+               ")")))
     {
-        qDebug() << "Ошибка при создании таблицы\n";
-        return;
+     QMessageBox::critical(this, tr("Сервер"),
+                      tr("Ошибка при создании таблицы: %1.")
+                      .arg(query.lastError().text()));
+     return;
     }
-
-    qDebug() << "Таблица успешно создана\n";
-}
-
-Server::~Server()
-{
-    this->close();
 }
 
